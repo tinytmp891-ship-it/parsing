@@ -1,4 +1,13 @@
 import { db } from "@/db";
+import {
+  memCountUpcomingEvents,
+  memCreateSyncRun,
+  memDeletePastEvents,
+  memDeleteStaleUpcomingEvents,
+  memGetLastFinishedRun,
+  memUpdateSyncRun,
+  memUpsertEvents,
+} from "@/db/memory";
 import { syncRuns, upcomingEvents } from "@/db/schema";
 import { getFeedHealth } from "@/lib/onexbet/feed";
 import { and, desc, eq, gt, lt, ne, sql } from "drizzle-orm";
@@ -105,6 +114,11 @@ async function saveEvents(events: NormalizedEvent[], seenAt: Date): Promise<numb
   for (const event of events) unique.set(`${event.source}:${event.externalId}`, toRow(event, seenAt));
   const rows = [...unique.values()];
 
+  if (!db) {
+    memUpsertEvents(rows);
+    return rows.length;
+  }
+
   for (let index = 0; index < rows.length; index += INSERT_CHUNK) {
     await db
       .insert(upcomingEvents)
@@ -136,10 +150,14 @@ function isUnavailableError(error: unknown): boolean {
 
 async function runSource(adapter: SourceAdapter, ctx: RunContext, startedAt: Date): Promise<void> {
   const progress = syncState.progress[adapter.id];
-  const [run] = await db
-    .insert(syncRuns)
-    .values({ source: adapter.id, status: "running", startedAt })
-    .returning({ id: syncRuns.id });
+  const run = db
+    ? (
+        await db
+          .insert(syncRuns)
+          .values({ source: adapter.id, status: "running", startedAt })
+          .returning({ id: syncRuns.id })
+      )[0]
+    : memCreateSyncRun(adapter.id, startedAt);
   ctx.runId = run.id;
 
   let host: string | null = null;
@@ -172,46 +190,71 @@ async function runSource(adapter: SourceAdapter, ctx: RunContext, startedAt: Dat
     // (only when every request succeeded, so a partial outage never wipes good data).
     progress.state = "finishing";
     const now = new Date();
-    await db
-      .delete(upcomingEvents)
-      .where(
-        and(
-          eq(upcomingEvents.source, adapter.id),
-          lt(upcomingEvents.startsAt, new Date(now.getTime() - PAST_RETENTION_MS)),
-        ),
-      );
-    if (progress.tasksFailed === 0) {
+    const pastCutoff = new Date(now.getTime() - PAST_RETENTION_MS);
+    if (db) {
       await db
         .delete(upcomingEvents)
         .where(
           and(
             eq(upcomingEvents.source, adapter.id),
-            lt(upcomingEvents.lastSeenAt, startedAt),
-            gt(upcomingEvents.startsAt, now),
+            lt(upcomingEvents.startsAt, pastCutoff),
           ),
         );
+      if (progress.tasksFailed === 0) {
+        await db
+          .delete(upcomingEvents)
+          .where(
+            and(
+              eq(upcomingEvents.source, adapter.id),
+              lt(upcomingEvents.lastSeenAt, startedAt),
+              gt(upcomingEvents.startsAt, now),
+            ),
+          );
+      }
+    } else {
+      memDeletePastEvents(adapter.id, pastCutoff);
+      if (progress.tasksFailed === 0) {
+        memDeleteStaleUpcomingEvents(adapter.id, startedAt, now);
+      }
     }
 
-    const [{ total }] = await db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(upcomingEvents)
-      .where(and(eq(upcomingEvents.source, adapter.id), gt(upcomingEvents.startsAt, now)));
+    const total = db
+      ? (
+          await db
+            .select({ total: sql<number>`count(*)::int` })
+            .from(upcomingEvents)
+            .where(and(eq(upcomingEvents.source, adapter.id), gt(upcomingEvents.startsAt, now)))
+        )[0].total
+      : memCountUpcomingEvents(adapter.id, now);
 
     const status = progress.tasksFailed === 0 ? "success" : total > 0 ? "partial" : "failed";
     const sourceDomain = host ?? (adapter.id === "1xbet" ? getFeedHealth().lastGoodDomain : null);
+    const finishedAt = new Date();
 
-    await db
-      .update(syncRuns)
-      .set({
+    if (db) {
+      await db
+        .update(syncRuns)
+        .set({
+          status,
+          finishedAt,
+          sourceDomain,
+          tasksTotal: progress.tasksTotal,
+          tasksFailed: progress.tasksFailed,
+          matchesCount: total,
+          error: firstError,
+        })
+        .where(eq(syncRuns.id, run.id));
+    } else {
+      memUpdateSyncRun(run.id, {
         status,
-        finishedAt: new Date(),
+        finishedAt,
         sourceDomain,
         tasksTotal: progress.tasksTotal,
         tasksFailed: progress.tasksFailed,
         matchesCount: total,
         error: firstError,
-      })
-      .where(eq(syncRuns.id, run.id));
+      });
+    }
 
     progress.state = status === "failed" ? "failed" : "done";
     progress.error = status === "failed" ? firstError : null;
@@ -225,10 +268,14 @@ async function runSource(adapter: SourceAdapter, ctx: RunContext, startedAt: Dat
       progress.state = "failed";
     }
     progress.error = message;
-    await db
-      .update(syncRuns)
-      .set({ status: "failed", finishedAt: new Date(), error: message })
-      .where(eq(syncRuns.id, run.id));
+    if (db) {
+      await db
+        .update(syncRuns)
+        .set({ status: "failed", finishedAt: new Date(), error: message })
+        .where(eq(syncRuns.id, run.id));
+    } else {
+      memUpdateSyncRun(run.id, { status: "failed", finishedAt: new Date(), error: message });
+    }
   }
 }
 
@@ -270,10 +317,14 @@ async function runWithBudget(adapter: SourceAdapter): Promise<void> {
     progress.state = "failed";
     progress.error = `timed out after ${SOURCE_BUDGET_MS / 1000} s`;
     if (ctx.runId !== null) {
-      await db
-        .update(syncRuns)
-        .set({ status: "failed", finishedAt: new Date(), error: progress.error })
-        .where(and(eq(syncRuns.id, ctx.runId), eq(syncRuns.status, "running")));
+      if (db) {
+        await db
+          .update(syncRuns)
+          .set({ status: "failed", finishedAt: new Date(), error: progress.error })
+          .where(and(eq(syncRuns.id, ctx.runId), eq(syncRuns.status, "running")));
+      } else {
+        memUpdateSyncRun(ctx.runId, { status: "failed", finishedAt: new Date(), error: progress.error }, true);
+      }
     }
   }
 
@@ -284,6 +335,9 @@ async function runWithBudget(adapter: SourceAdapter): Promise<void> {
 }
 
 async function getLastFinishedRun(source: SourceId) {
+  if (!db) {
+    return memGetLastFinishedRun(source);
+  }
   const [row] = await db
     .select()
     .from(syncRuns)

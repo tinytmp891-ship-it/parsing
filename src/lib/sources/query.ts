@@ -1,4 +1,5 @@
 import { db } from "@/db";
+import { memGetCoverageUntil, memLoadEvents, memLoadUpcomingEvents } from "@/db/memory";
 import { upcomingEvents } from "@/db/schema";
 import { and, asc, gt, gte, lte, max } from "drizzle-orm";
 import { type NormalizedEvent, type SourceId } from "./model";
@@ -21,6 +22,9 @@ function toEvent(row: UpcomingRow): NormalizedEvent {
 
 /** All stored upcoming events that start inside the range, across every bookmaker. */
 export async function loadEvents(from: Date, to: Date): Promise<NormalizedEvent[]> {
+  if (!db) {
+    return memLoadEvents(from, to).map(toEvent);
+  }
   const rows = await db
     .select()
     .from(upcomingEvents)
@@ -31,6 +35,9 @@ export async function loadEvents(from: Date, to: Date): Promise<NormalizedEvent[
 
 /** Every stored event that has not started yet (used by the match checker). */
 export async function loadUpcomingEvents(): Promise<NormalizedEvent[]> {
+  if (!db) {
+    return memLoadUpcomingEvents().map(toEvent);
+  }
   const rows = await db
     .select()
     .from(upcomingEvents)
@@ -41,6 +48,9 @@ export async function loadUpcomingEvents(): Promise<NormalizedEvent[]> {
 
 /** Latest upcoming start time currently stored (how far the schedule goes). */
 export async function getCoverageUntil(): Promise<string | null> {
+  if (!db) {
+    return memGetCoverageUntil();
+  }
   const [row] = await db
     .select({ latest: max(upcomingEvents.startsAt) })
     .from(upcomingEvents)
