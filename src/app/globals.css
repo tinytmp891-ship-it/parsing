@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* Make the dark: variant follow the in-app theme toggle (the .dark class), not the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Dark theme. Tailwind utilities read these palette variables, so remapping them
+ * restyles every existing class without touching the components.
+ * The scales are inverted: light tints become dark tints, and text becomes light.
+ */
+.dark {
+  color-scheme: dark;
+
+  --color-white: #0f172a;
+  --color-black: #f8fafc;
+
+  --color-slate-50: #0b1220;
+  --color-slate-100: #020617;
+  --color-slate-200: #1e293b;
+  --color-slate-300: #334155;
+  --color-slate-400: #475569;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #cbd5e1;
+  --color-slate-700: #e2e8f0;
+  --color-slate-800: #f1f5f9;
+  --color-slate-900: #f8fafc;
+  --color-slate-950: #ffffff;
+
+  --color-emerald-50: #052e22;
+  --color-emerald-100: #064e3b;
+  --color-emerald-200: #065f46;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-emerald-500: #34d399;
+  --color-emerald-600: #10b981;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+
+  --color-amber-50: #2a1c04;
+  --color-amber-100: #3d2806;
+  --color-amber-200: #5c3b08;
+  --color-amber-300: #8a5a0c;
+  --color-amber-400: #b45309;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+
+  --color-rose-50: #2a0c16;
+  --color-rose-100: #3f1024;
+  --color-rose-200: #5f1a36;
+  --color-rose-300: #881e4b;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+
+  --color-sky-50: #0a1f33;
+  --color-sky-100: #0c2b45;
+  --color-sky-200: #0f3d61;
+  --color-sky-300: #075985;
+  --color-sky-500: #0ea5e9;
+  --color-sky-600: #0284c7;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+  --color-sky-900: #e0f2fe;
+
+  --color-violet-50: #1a1030;
+  --color-violet-100: #251842;
+  --color-violet-200: #3b2470;
+  --color-violet-300: #5b21b6;
+  --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed;
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #ddd6fe;
+  --color-violet-900: #ede9fe;
+
+  --color-orange-50: #2b1505;
+  --color-orange-100: #3d1e08;
+  --color-orange-200: #5c2c0b;
+  --color-orange-500: #f97316;
+  --color-orange-700: #fdba74;
+  --color-orange-800: #fed7aa;
+  --color-orange-900: #ffedd5;
+
+  --color-lime-50: #14230a;
+  --color-lime-100: #1d3210;
+  --color-lime-200: #2e4f18;
+  --color-lime-500: #84cc16;
+  --color-lime-700: #bef264;
+  --color-lime-800: #d9f99d;
+  --color-lime-900: #ecfccb;
+}
