@@ -22,6 +22,9 @@ export const upcomingEvents = pgTable(
     awayRu: text("away_ru").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     sourceHost: text("source_host"),
+    matchFormat: text("match_format"),
+    tournamentStage: text("tournament_stage"),
+    matchInfo: text("match_info"),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

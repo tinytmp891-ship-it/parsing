@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { BOOKMAKER_IDS, normalizeIconUrl, type BookmakerStyle, type BookmakerStyles } from "@/lib/bookmaker-style";
 import type { Dict } from "@/lib/i18n";
 import { SOURCE_NAMES } from "@/lib/matches-types";
@@ -26,10 +27,6 @@ function IconUrlField({
 }) {
   const [draft, setDraft] = useState(value);
 
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
   const trimmed = draft.trim();
   const invalid = trimmed.length > 0 && normalizeIconUrl(trimmed) === "";
 
@@ -50,7 +47,7 @@ function IconUrlField({
             if (valid) onSave(valid);
           }
         }}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+        className="ui-accent-input w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400"
       />
       {invalid ? <p className="mt-1 text-xs text-rose-700">{invalidText}</p> : null}
     </div>
@@ -69,15 +66,21 @@ export function BookmakerSettings({
   onChange: (id: SourceId, patch: Partial<BookmakerStyle>) => void;
   onReset: () => void;
 }) {
+  const [resetEpoch, setResetEpoch] = useState(0);
+
   return (
     <div className="mt-6 border-t border-slate-200 pt-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold text-slate-950">{t.bookmakerStylesTitle}</p>
         <button
           type="button"
-          onClick={onReset}
-          className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+          onClick={() => {
+            onReset();
+            setResetEpoch((n) => n + 1);
+          }}
+          className="ui-control inline-flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
         >
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden />
           {t.bookmakerStylesReset}
         </button>
       </div>
@@ -103,6 +106,7 @@ export function BookmakerSettings({
               </div>
 
               <IconUrlField
+                key={`${id}:${resetEpoch}`}
                 value={style.iconUrl}
                 label={`${SOURCE_NAMES[id]} ${t.bookmakerIconLabel}`}
                 placeholder={t.bookmakerIconPlaceholder}

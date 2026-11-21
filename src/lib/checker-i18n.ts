@@ -21,6 +21,9 @@ const en = {
   empty: "Paste at least one match line.",
   failed: "Check failed",
   schedulePrefix: (n: number) => `Checked against ${n.toLocaleString("en-US")} events starting in the next 24 hours`,
+  allStartAt: (time: string) => `All found matches start at ${time}`,
+  allStartInHour: (hour: string) => `All found matches start in the ${hour}:00 hour`,
+  kickoffTime: "Start time",
 };
 
 export type CheckerDict = typeof en;
@@ -47,6 +50,9 @@ const ru: CheckerDict = {
   empty: "Вставьте хотя бы одну строку матча.",
   failed: "Ошибка проверки",
   schedulePrefix: (n: number) => `Проверено по ${n.toLocaleString("ru-RU")} событиям, которые начнутся в ближайшие 24 часа`,
+  allStartAt: (time: string) => `Все найденные матчи начинаются в ${time}`,
+  allStartInHour: (hour: string) => `Все найденные матчи начинаются в ${hour}:00–${hour}:59`,
+  kickoffTime: "Время начала",
 };
 
 export const checkerDictionaries: Record<Lang, CheckerDict> = { en, ru };

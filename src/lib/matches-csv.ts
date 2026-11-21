@@ -2,8 +2,8 @@ import { dictionaries, type Lang } from "./i18n";
 import { pad, pick, SOURCE_NAMES, type Entry } from "./matches-types";
 
 const HEADERS: Record<Lang, string[]> = {
-  en: ["Date", "Time", "Start (UTC)", "Sport", "League", "Home", "Away", "Match type", "Bookmakers", "Bookmaker names", "Bookmaker IDs"],
-  ru: ["Дата", "Время", "Начало (UTC)", "Вид спорта", "Лига", "Хозяева", "Гости", "Тип совпадения", "Букмекеры", "Названия у букмекеров", "ID у букмекеров"],
+  en: ["Date", "Time", "Start (UTC)", "Sport", "Format", "Stage", "Venue", "League", "Home", "Away", "Match type", "Bookmakers", "Bookmaker names", "Bookmaker IDs"],
+  ru: ["Дата", "Время", "Начало (UTC)", "Вид спорта", "Формат", "Этап", "Место", "Лига", "Хозяева", "Гости", "Тип совпадения", "Букмекеры", "Названия у букмекеров", "ID у букмекеров"],
 };
 
 function escapeCell(value: string): string {
@@ -22,12 +22,20 @@ export function buildMatchesCsv(entries: Entry[], lang: Lang): string {
     const ids = entry.sources.map((source) => `${SOURCE_NAMES[source.source] ?? source.source} ${source.externalId}`);
     const matchType =
       entry.matchType === "partial" ? t.typePartial : entry.matchType === "full" ? t.typeFull : t.typeSingle;
+    const venueSummary = entry.matchInfo
+      ? [entry.matchInfo.stadium || entry.matchInfo.venueRaw, entry.matchInfo.city, entry.matchInfo.country]
+          .filter(Boolean)
+          .join(", ")
+      : "";
 
     return [
       `${starts.getFullYear()}-${pad(starts.getMonth() + 1)}-${pad(starts.getDate())}`,
       `${pad(starts.getHours())}:${pad(starts.getMinutes())}`,
       entry.startsAt,
       pick(entry.sportName, lang),
+      entry.matchFormat ? `${entry.matchFormat.code} (${pick(entry.matchFormat.label, lang)})` : "",
+      entry.tournamentStage ? pick(entry.tournamentStage.label, lang) : "",
+      venueSummary,
       pick(entry.leagueName, lang),
       pick(entry.home, lang),
       pick(entry.away, lang),

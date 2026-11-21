@@ -1,4 +1,6 @@
 import type { Lang } from "./i18n";
+import type { MatchFormat, MatchFormatCategory, MatchFormatOrigin } from "./sources/format";
+import type { MatchVenueInfo, StageOrigin, TournamentStage } from "./sources/match-details";
 
 /** Types and helpers shared by the matches page components. */
 
@@ -8,6 +10,7 @@ export type Theme = "light" | "dark";
 export type Tab = "upcoming" | "started";
 export type View = "bubbles" | "table";
 export type MatchType = "single" | "full" | "partial";
+export type { MatchFormat, MatchFormatCategory, MatchFormatOrigin, MatchVenueInfo, StageOrigin, TournamentStage };
 
 export type Entry = {
   id: string;
@@ -17,6 +20,9 @@ export type Entry = {
   leagueName: LocalizedText;
   home: LocalizedText;
   away: LocalizedText;
+  matchFormat: MatchFormat | null;
+  tournamentStage: TournamentStage | null;
+  matchInfo: MatchVenueInfo | null;
   matchType: MatchType;
   sources: {
     source: string;
@@ -108,10 +114,18 @@ export type ApiResponse = {
 export const SOURCE_NAMES: Record<string, string> = {
   "1xbet": "1xBet",
   fonbet: "Fonbet",
-  bet365: "bet365",
+  betcity: "Betcity",
   marathon: "Marathonbet",
   vbet: "Vbet",
+  unibet: "Unibet",
+  netbet: "NetBet",
+  bcgame: "BC.Game",
+  parimatch: "Parimatch",
+  oddsportal: "OddsPortal",
+  oddspedia: "Oddspedia",
+  bet365: "bet365",
   bwin: "bwin",
+  totogaming: "TotoGaming",
   stake: "Stake",
   pinnacle: "Pinnacle",
 };
@@ -119,10 +133,18 @@ export const SOURCE_NAMES: Record<string, string> = {
 export const SOURCE_SITES: Record<string, string> = {
   "1xbet": "https://1xbet.com",
   fonbet: "https://fonbet.by",
-  bet365: "https://www.bet365.com",
-  marathon: "https://www.marathonbet.com",
+  betcity: "https://betcity.ru",
+  marathon: "https://www.marathonbet.ru/en/",
   vbet: "https://sport.vbet.am",
+  unibet: "https://www.unibet.com.au/",
+  netbet: "https://sport.netbet.ro/",
+  bcgame: "https://playglobal16.com/",
+  parimatch: "https://parimatch.com/",
+  oddsportal: "https://www.oddsportal.com/",
+  oddspedia: "https://oddspedia.com/",
+  bet365: "https://www.bet365.com",
   bwin: "https://www.bwin.com",
+  totogaming: "https://sport.totogaming.am",
   stake: "https://stake.com/sports/",
   pinnacle: "https://www.pinnacle.com/en/hockey/matchups/",
 };
@@ -130,10 +152,18 @@ export const SOURCE_SITES: Record<string, string> = {
 export const SOURCE_STYLES: Record<string, string> = {
   "1xbet": "bg-sky-100 text-sky-800 ring-sky-200",
   fonbet: "bg-violet-100 text-violet-800 ring-violet-200",
-  bet365: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+  betcity: "bg-blue-100 text-blue-800 ring-blue-200",
   marathon: "bg-lime-100 text-lime-800 ring-lime-200",
   vbet: "bg-orange-100 text-orange-800 ring-orange-200",
+  unibet: "bg-green-100 text-green-800 ring-green-200",
+  netbet: "bg-teal-100 text-teal-800 ring-teal-200",
+  bcgame: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+  parimatch: "bg-yellow-100 text-yellow-800 ring-yellow-200",
+  oddsportal: "bg-cyan-100 text-cyan-800 ring-cyan-200",
+  oddspedia: "bg-purple-100 text-purple-800 ring-purple-200",
+  bet365: "bg-emerald-100 text-emerald-800 ring-emerald-200",
   bwin: "bg-slate-200 text-slate-800 ring-slate-300",
+  totogaming: "bg-red-100 text-red-800 ring-red-200",
   stake: "bg-indigo-100 text-indigo-800 ring-indigo-200",
   pinnacle: "bg-rose-100 text-rose-800 ring-rose-200",
 };
@@ -227,6 +257,11 @@ export function formatElapsed(ms: number): string {
 
 export function sourceUrl(source: { source: string; sourceHost: string | null }): string {
   if (source.source === "1xbet" && source.sourceHost) return `https://${source.sourceHost}`;
+  if (source.source === "marathon" && source.sourceHost) {
+    return source.sourceHost.startsWith("new.") || source.sourceHost.startsWith("mobile.")
+      ? `https://${source.sourceHost}/su/`
+      : `https://${source.sourceHost}/en/`;
+  }
   return SOURCE_SITES[source.source] ?? "#";
 }
 

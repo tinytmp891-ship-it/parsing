@@ -2,11 +2,33 @@ import { db } from "@/db";
 import { memGetCoverageUntil, memLoadEvents, memLoadUpcomingEvents } from "@/db/memory";
 import { upcomingEvents } from "@/db/schema";
 import { and, asc, gt, gte, lte, max } from "drizzle-orm";
+import { extractMatchFormat, parseStoredMatchFormat } from "./format";
+import {
+  extractTournamentStage,
+  parseStoredMatchVenueInfo,
+  parseStoredTournamentStage,
+} from "./match-details";
 import { type NormalizedEvent, type SourceId } from "./model";
 
 type UpcomingRow = typeof upcomingEvents.$inferSelect;
 
 function toEvent(row: UpcomingRow): NormalizedEvent {
+  const matchFormat =
+    parseStoredMatchFormat(row.matchFormat) ??
+    extractMatchFormat({
+      sportKey: row.sportKey,
+      leagueEn: row.leagueNameEn,
+      leagueRu: row.leagueNameRu,
+      homeEn: row.homeEn,
+      awayEn: row.awayEn,
+    });
+  const tournamentStage =
+    parseStoredTournamentStage(row.tournamentStage) ??
+    extractTournamentStage({
+      leagueEn: row.leagueNameEn,
+      leagueRu: row.leagueNameRu,
+    });
+  const matchInfo = parseStoredMatchVenueInfo(row.matchInfo);
   return {
     source: row.source as SourceId,
     externalId: row.externalId,
@@ -17,6 +39,9 @@ function toEvent(row: UpcomingRow): NormalizedEvent {
     away: { en: row.awayEn, ru: row.awayRu },
     startsAt: row.startsAt,
     sourceHost: row.sourceHost,
+    matchFormat,
+    tournamentStage,
+    matchInfo,
   };
 }
 

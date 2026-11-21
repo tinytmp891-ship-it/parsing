@@ -1,4 +1,6 @@
 import { feedGet, feedGetWithVariants } from "@/lib/onexbet/feed";
+import { extractMatchFormat } from "./format";
+import { extractMatchVenueInfo, extractTournamentStage } from "./match-details";
 import {
   isPresent,
   mapWithConcurrency,
@@ -26,6 +28,10 @@ type RawGame = {
   O2R?: string;
   L?: string;
   LR?: string;
+  CN?: string;
+  MIO?: { MaF?: string; TSt?: string; Loc?: string };
+  MIS?: { K?: number; V?: string }[];
+  SC?: { CPS?: string };
 };
 type RawChamp = { LI: number; L: string; LR?: string; G?: RawGame[] };
 
@@ -44,16 +50,52 @@ function toEvent(game: RawGame, ctx: Context, host: string, nowMs: number): Norm
   if (startsAt.getTime() <= nowMs) return null;
 
   const leagueEn = game.L || ctx.league.en;
+  const leagueRu = game.LR || ctx.league.ru || leagueEn;
+  const homeEn = game.O1.trim();
+  const awayEn = game.O2.trim();
+
+  const misValue = (key: number): string | undefined => {
+    const raw = game.MIS?.find((item) => item?.K === key)?.V;
+    return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
+  };
+
+  const tournamentStage = extractTournamentStage({
+    leagueEn,
+    leagueRu,
+    feedHints: [game.MIO?.TSt, misValue(1)],
+  });
+
+  const matchInfo = extractMatchVenueInfo({
+    country: game.CN || misValue(11),
+    locationRaw: game.MIO?.Loc || misValue(2),
+    surface: misValue(10),
+    temperature: misValue(9),
+    weather: misValue(21),
+    windSpeed: misValue(23),
+    windDir: misValue(24),
+    humidity: misValue(27),
+  });
+
   return {
     source: "1xbet",
     externalId: String(game.I),
     sportKey: ctx.sport.key,
     sportName: ctx.sport.name,
-    leagueName: { en: leagueEn, ru: game.LR || ctx.league.ru || leagueEn },
-    home: { en: game.O1.trim(), ru: (game.O1R || game.O1).trim() },
-    away: { en: game.O2.trim(), ru: (game.O2R || game.O2).trim() },
+    leagueName: { en: leagueEn, ru: leagueRu },
+    home: { en: homeEn, ru: (game.O1R || game.O1).trim() },
+    away: { en: awayEn, ru: (game.O2R || game.O2).trim() },
     startsAt,
     sourceHost: host,
+    matchFormat: extractMatchFormat({
+      sportKey: ctx.sport.key,
+      leagueEn,
+      leagueRu,
+      homeEn,
+      awayEn,
+      feedHints: [game.MIO?.MaF, game.MIO?.TSt, game.SC?.CPS],
+    }),
+    tournamentStage,
+    matchInfo,
   };
 }
 

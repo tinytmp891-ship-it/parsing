@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { styleOf, type BookmakerStyle } from "@/lib/bookmaker-style";
 import type { Dict } from "@/lib/i18n";
 import { tintOf } from "@/lib/match-colors";
@@ -47,7 +48,7 @@ export function BookmakerChip({
 }) {
   const { bookmakerStyles } = useMatchStyle();
   const style = styleOf(bookmakerStyles, sourceId);
-  const classes = `inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-slate-900 ${
+  const classes = `ui-control inline-flex max-w-full items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold text-slate-900 ${
     href ? "transition hover:opacity-80" : ""
   } ${className}`;
   const chipStyle = { backgroundColor: tintOf(style.color), boxShadow: `inset 0 0 0 1px ${style.color}` };
@@ -55,7 +56,7 @@ export function BookmakerChip({
     <>
       <BookmakerIcon key={style.iconUrl} style={style} />
       <span className="truncate">{SOURCE_NAMES[sourceId] ?? sourceId}</span>
-      {href ? <span aria-hidden>↗</span> : null}
+      {href ? <ArrowUpRight className="h-3 w-3 shrink-0 opacity-75" aria-hidden /> : null}
     </>
   );
 

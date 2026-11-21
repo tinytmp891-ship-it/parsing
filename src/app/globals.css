@@ -3,6 +3,210 @@
 /* Make the dark: variant follow the in-app theme toggle (the .dark class), not the OS setting. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme inline {
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  --ui-accent: #059669;
+  --ui-accent-hover: #047857;
+  --ui-accent-soft: rgba(5, 150, 105, 0.12);
+  --ui-accent-ring: rgba(5, 150, 105, 0.35);
+  --ui-accent-text: #065f46;
+
+  --ui-card-radius: 1rem;
+  --ui-bubble-radius: 1.375rem;
+  --ui-control-radius: 9999px;
+  --ui-card-pad: 1.25rem;
+  --ui-row-py: 0.75rem;
+}
+
+html[data-accent="sky"] {
+  --ui-accent: #0284c7;
+  --ui-accent-hover: #0369a1;
+  --ui-accent-soft: rgba(2, 132, 199, 0.12);
+  --ui-accent-ring: rgba(2, 132, 199, 0.35);
+  --ui-accent-text: #075985;
+}
+html[data-accent="indigo"] {
+  --ui-accent: #4f46e5;
+  --ui-accent-hover: #4338ca;
+  --ui-accent-soft: rgba(79, 70, 229, 0.12);
+  --ui-accent-ring: rgba(79, 70, 229, 0.35);
+  --ui-accent-text: #3730a3;
+}
+html[data-accent="amber"] {
+  --ui-accent: #d97706;
+  --ui-accent-hover: #b45309;
+  --ui-accent-soft: rgba(217, 119, 6, 0.14);
+  --ui-accent-ring: rgba(217, 119, 6, 0.35);
+  --ui-accent-text: #92400e;
+}
+html[data-accent="rose"] {
+  --ui-accent: #e11d48;
+  --ui-accent-hover: #be123c;
+  --ui-accent-soft: rgba(225, 29, 72, 0.12);
+  --ui-accent-ring: rgba(225, 29, 72, 0.35);
+  --ui-accent-text: #9f1239;
+}
+html[data-accent="violet"] {
+  --ui-accent: #7c3aed;
+  --ui-accent-hover: #6d28d9;
+  --ui-accent-soft: rgba(124, 58, 237, 0.12);
+  --ui-accent-ring: rgba(124, 58, 237, 0.35);
+  --ui-accent-text: #5b21b6;
+}
+
+.dark {
+  --ui-accent: #10b981;
+  --ui-accent-hover: #34d399;
+  --ui-accent-soft: rgba(16, 185, 129, 0.18);
+  --ui-accent-ring: rgba(52, 211, 153, 0.38);
+  --ui-accent-text: #6ee7b7;
+}
+.dark[data-accent="sky"] {
+  --ui-accent: #0ea5e9;
+  --ui-accent-hover: #38bdf8;
+  --ui-accent-soft: rgba(14, 165, 233, 0.18);
+  --ui-accent-ring: rgba(56, 189, 248, 0.38);
+  --ui-accent-text: #7dd3fc;
+}
+.dark[data-accent="indigo"] {
+  --ui-accent: #6366f1;
+  --ui-accent-hover: #818cf8;
+  --ui-accent-soft: rgba(99, 102, 241, 0.2);
+  --ui-accent-ring: rgba(129, 140, 248, 0.4);
+  --ui-accent-text: #a5b4fc;
+}
+.dark[data-accent="amber"] {
+  --ui-accent: #f59e0b;
+  --ui-accent-hover: #fbbf24;
+  --ui-accent-soft: rgba(245, 158, 11, 0.18);
+  --ui-accent-ring: rgba(251, 191, 36, 0.4);
+  --ui-accent-text: #fcd34d;
+}
+.dark[data-accent="rose"] {
+  --ui-accent: #f43f5e;
+  --ui-accent-hover: #fb7185;
+  --ui-accent-soft: rgba(244, 63, 94, 0.18);
+  --ui-accent-ring: rgba(251, 113, 133, 0.4);
+  --ui-accent-text: #fda4af;
+}
+.dark[data-accent="violet"] {
+  --ui-accent: #8b5cf6;
+  --ui-accent-hover: #a78bfa;
+  --ui-accent-soft: rgba(139, 92, 246, 0.2);
+  --ui-accent-ring: rgba(167, 139, 250, 0.4);
+  --ui-accent-text: #c4b5fd;
+}
+
+/* Radius presets */
+html[data-radius="sharp"] {
+  --ui-card-radius: 0.5rem;
+  --ui-bubble-radius: 0.625rem;
+  --ui-control-radius: 0.375rem;
+}
+html[data-radius="rounded"] {
+  --ui-card-radius: 1rem;
+  --ui-bubble-radius: 1.375rem;
+  --ui-control-radius: 9999px;
+}
+html[data-radius="pill"] {
+  --ui-card-radius: 1.5rem;
+  --ui-bubble-radius: 2rem;
+  --ui-control-radius: 9999px;
+}
+
+/* Density presets */
+html[data-density="compact"] {
+  --ui-card-pad: 0.9rem;
+  --ui-row-py: 0.5rem;
+}
+html[data-density="balanced"] {
+  --ui-card-pad: 1.25rem;
+  --ui-row-py: 0.8rem;
+}
+html[data-density="spacious"] {
+  --ui-card-pad: 1.6rem;
+  --ui-row-py: 1.05rem;
+}
+
+/* Ambient backdrop wash */
+html[data-ambient="on"] body {
+  background-image:
+    radial-gradient(ellipse 80% 45% at 50% -12%, var(--ui-accent-soft), transparent 70%);
+  background-repeat: no-repeat;
+}
+
+/* Custom UI surface helpers controlled by Settings */
+.ui-card {
+  border-radius: var(--ui-card-radius);
+  transition: box-shadow 180ms ease, border-radius 180ms ease, background-color 180ms ease;
+}
+.ui-card-pad {
+  padding: var(--ui-card-pad);
+}
+.ui-bubble {
+  border-radius: var(--ui-bubble-radius);
+  transition: box-shadow 180ms ease, border-radius 180ms ease, transform 180ms ease;
+}
+.ui-control {
+  border-radius: var(--ui-control-radius);
+}
+.ui-row-pad {
+  padding-top: var(--ui-row-py);
+  padding-bottom: var(--ui-row-py);
+}
+html[data-surface="frosted"] .ui-card,
+html[data-surface="frosted"] .ui-bubble {
+  background-color: color-mix(in srgb, var(--color-white) 90%, transparent);
+  backdrop-filter: blur(12px);
+}
+html[data-surface="elevated"] .ui-card,
+html[data-surface="elevated"] .ui-bubble {
+  box-shadow: 0 10px 28px -10px rgba(15, 23, 42, 0.14), 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+html.dark[data-surface="elevated"] .ui-card,
+html.dark[data-surface="elevated"] .ui-bubble {
+  box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(148, 163, 184, 0.14);
+}
+
+.ui-accent-bg {
+  background-color: var(--ui-accent);
+  color: #ffffff;
+}
+.ui-accent-bg:hover {
+  background-color: var(--ui-accent-hover);
+}
+.ui-accent-soft {
+  background-color: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+}
+.ui-accent-text {
+  color: var(--ui-accent-text);
+}
+.ui-accent-input:focus {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px var(--ui-accent-ring);
+  outline: none;
+}
+.ui-accent-slider {
+  accent-color: var(--ui-accent);
+}
+
+.main-layout {
+  margin-left: 0.75rem;
+  margin-right: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .main-layout {
+    margin-left: var(--main-ml, 64px);
+    margin-right: var(--main-mr, 64px);
+  }
+}
+
 /*
  * Dark theme. Tailwind utilities read these palette variables, so remapping them
  * restyles every existing class without touching the components.

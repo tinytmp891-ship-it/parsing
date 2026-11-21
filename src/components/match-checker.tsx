@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Clock, ListChecks, Sparkles, X } from "lucide-react";
 import { checkerDictionaries } from "@/lib/checker-i18n";
-import type { Lang } from "@/lib/i18n";
+import { dictionaries, type Lang } from "@/lib/i18n";
+import { pick, SOURCE_NAMES } from "@/lib/matches-types";
+import { StarLabels } from "./matches/bookmaker-chip";
 
 type Status = "green" | "yellow" | "red" | "invalid";
 
@@ -37,29 +40,15 @@ const SAMPLE = `Эссекс Ребелс - Ноттингем Хоудс       
 Лоугхбороугх Ридерс - Сити оф Бирмингэм Рокетс       Баскетбол.Великобритания. БЦБ  с ОТ  770943805`;
 
 const STATUS_STYLE: Record<Status, { box: string; badge: string }> = {
-  green: { box: "border-emerald-300 bg-emerald-50", badge: "bg-emerald-600 text-white" },
-  yellow: { box: "border-amber-300 bg-amber-50", badge: "bg-amber-500 text-white" },
-  red: { box: "border-rose-300 bg-rose-50", badge: "bg-rose-600 text-white" },
+  green: { box: "border-emerald-300 bg-emerald-50/90", badge: "bg-emerald-600 text-white" },
+  yellow: { box: "border-amber-300 bg-amber-50/90", badge: "bg-amber-500 text-white" },
+  red: { box: "border-rose-300 bg-rose-50/90", badge: "bg-rose-600 text-white" },
   invalid: { box: "border-slate-300 bg-slate-50", badge: "bg-slate-500 text-white" },
 };
 
-const SOURCE_NAMES: Record<string, string> = {
-  "1xbet": "1xBet",
-  fonbet: "Fonbet",
-  bet365: "bet365",
-  marathon: "Marathonbet",
-  vbet: "Vbet",
-  bwin: "bwin",
-  stake: "Stake",
-  pinnacle: "Pinnacle",
-};
-
-function pick(text: { en: string; ru: string }, lang: Lang): string {
-  return text[lang] || text.en;
-}
-
 export default function MatchChecker({ lang }: { lang: Lang }) {
   const t = checkerDictionaries[lang];
+  const mainDict = dictionaries[lang];
   const locale = lang === "ru" ? "ru-RU" : "en-US";
 
   const [text, setText] = useState("");
@@ -105,21 +94,52 @@ export default function MatchChecker({ lang }: { lang: Lang }) {
     invalid: t.invalid,
   };
 
+  const timeFormatter = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
+  const stampFormatter = new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  // Check if all found matches start at the same time (exact HH:MM, or same hour HH).
+  const matchedResults = results?.filter((r) => r.match !== null) ?? [];
+  let commonStartBanner: string | null = null;
+  if (matchedResults.length > 0) {
+    const times = matchedResults.map((r) => timeFormatter.format(new Date(r.match!.startsAt)));
+    const uniqueTimes = new Set(times);
+    if (uniqueTimes.size === 1) {
+      commonStartBanner = t.allStartAt(times[0]);
+    } else {
+      const hours = matchedResults.map((r) => String(new Date(r.match!.startsAt).getHours()).padStart(2, "0"));
+      const uniqueHours = new Set(hours);
+      if (uniqueHours.size === 1) {
+        commonStartBanner = t.allStartInHour(hours[0]);
+      }
+    }
+  }
+
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-950">{t.title}</h2>
-        <p className="mt-1 text-sm text-slate-600">{t.subtitle}</p>
-        <p className="mt-1 text-xs text-slate-500">{t.legend}</p>
+    <section className="ui-card ui-card-pad bg-white shadow-sm ring-1 ring-slate-200/90">
+      <div className="flex items-start gap-3">
+        <span className="ui-accent-soft mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
+          <ListChecks className="h-4 w-4" aria-hidden />
+        </span>
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-slate-950 sm:text-lg">{t.title}</h2>
+          <p className="mt-0.5 text-sm text-slate-600">{t.subtitle}</p>
+          <p className="mt-1 text-xs text-slate-500">{t.legend}</p>
+        </div>
       </div>
 
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         placeholder={t.placeholder}
-        rows={5}
+        rows={4}
         spellCheck={false}
-        className="mt-4 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-200"
+        className="ui-accent-input mt-4 w-full rounded-xl border border-slate-300 bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-900 placeholder:text-slate-400 focus:bg-white"
       />
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -127,22 +147,25 @@ export default function MatchChecker({ lang }: { lang: Lang }) {
           type="button"
           onClick={runCheck}
           disabled={busy || text.trim().length === 0}
-          className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="ui-control ui-accent-bg inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-45"
         >
+          <Check className="h-4 w-4" aria-hidden />
           {busy ? t.checking : t.check}
         </button>
         <button
           type="button"
           onClick={() => setText(SAMPLE)}
-          className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+          className="ui-control inline-flex items-center gap-1.5 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
         >
+          <Sparkles className="h-3.5 w-3.5" aria-hidden />
           {t.sample}
         </button>
         <button
           type="button"
           onClick={clear}
-          className="rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+          className="ui-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
         >
+          <X className="h-3.5 w-3.5" aria-hidden />
           {t.clear}
         </button>
       </div>
@@ -152,32 +175,50 @@ export default function MatchChecker({ lang }: { lang: Lang }) {
       {summary && results ? (
         <div className="mt-5 space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="rounded-full bg-emerald-600 px-3 py-1 font-semibold text-white">{summary.green}</span>
-            <span className="rounded-full bg-amber-500 px-3 py-1 font-semibold text-white">{summary.yellow}</span>
-            <span className="rounded-full bg-rose-600 px-3 py-1 font-semibold text-white">{summary.red}</span>
+            <span className="ui-control bg-emerald-600 px-3 py-1 font-semibold tabular-nums text-white">{summary.green}</span>
+            <span className="ui-control bg-amber-500 px-3 py-1 font-semibold tabular-nums text-white">{summary.yellow}</span>
+            <span className="ui-control bg-rose-600 px-3 py-1 font-semibold tabular-nums text-white">{summary.red}</span>
             <span className="text-slate-600">{t.summary(summary.green, summary.yellow, summary.red)}</span>
             <span className="text-xs text-slate-500">· {t.schedulePrefix(scheduleSize)}</span>
+            {commonStartBanner ? (
+              <span className="ui-control inline-flex items-center gap-1.5 bg-sky-100 px-3 py-1 text-xs font-bold text-sky-900 ring-1 ring-inset ring-sky-300">
+                <Clock className="h-3.5 w-3.5" aria-hidden />
+                {commonStartBanner}
+              </span>
+            ) : null}
           </div>
 
           <ul className="space-y-3">
             {results.map((result) => {
               const style = STATUS_STYLE[result.status];
-              const stamp = result.match
-                ? new Intl.DateTimeFormat(locale, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(result.match.startsAt))
-                : null;
+              const matchDate = result.match ? new Date(result.match.startsAt) : null;
+              const matchTime = matchDate ? timeFormatter.format(matchDate) : null;
+              const stamp = matchDate ? stampFormatter.format(matchDate) : null;
+
               return (
                 <li key={result.index} className={`rounded-xl border p-4 ${style.box}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${style.badge}`}>
-                      {labelOf[result.status]}
-                    </span>
-                    <span className="text-xs text-slate-500">#{result.index}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`ui-control px-2.5 py-0.5 text-xs font-semibold ${style.badge}`}>
+                        {labelOf[result.status]}
+                      </span>
+                      {matchTime ? (
+                        <span
+                          title={t.kickoffTime}
+                          className="ui-control inline-flex items-center gap-1 bg-white px-2.5 py-0.5 text-xs font-bold tabular-nums text-slate-900 ring-1 ring-inset ring-slate-300"
+                        >
+                          <Clock className="h-3 w-3 text-slate-500" aria-hidden />
+                          {matchTime}
+                        </span>
+                      ) : null}
+                      {result.match ? (
+                        <StarLabels
+                          sources={result.match.sources.map((source) => ({ source }))}
+                          t={mainDict}
+                        />
+                      ) : null}
+                    </div>
+                    <span className="font-mono text-xs text-slate-500">#{result.index}</span>
                   </div>
 
                   <p className="mt-2 text-sm font-semibold">
@@ -204,17 +245,24 @@ export default function MatchChecker({ lang }: { lang: Lang }) {
                   ) : null}
 
                   {result.match ? (
-                    <div className="mt-3 rounded-lg bg-white/80 p-3 text-xs text-slate-700 ring-1 ring-inset ring-slate-200">
-                      <p className="font-semibold text-slate-900">
-                        {t.schedule}: {pick(result.match.home, lang)} – {pick(result.match.away, lang)}
-                        {result.match.idMatched ? (
-                          <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 font-medium text-sky-800">
-                            {t.sameId}
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="mt-0.5 text-slate-500">
-                        {stamp} · {pick(result.match.sportName, lang)} · {pick(result.match.leagueName, lang)} ·{" "}
+                    <div className="mt-3 rounded-lg bg-white/85 p-3 text-xs text-slate-700 ring-1 ring-inset ring-slate-200">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StarLabels
+                          sources={result.match.sources.map((source) => ({ source }))}
+                          t={mainDict}
+                        />
+                        <p className="font-semibold text-slate-900">
+                          {t.schedule}: {pick(result.match.home, lang)} – {pick(result.match.away, lang)}
+                          {result.match.idMatched ? (
+                            <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 font-medium text-sky-800">
+                              {t.sameId}
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                      <p className="mt-1 text-slate-600">
+                        <span className="font-semibold text-slate-800">{stamp}</span> · {pick(result.match.sportName, lang)} ·{" "}
+                        {pick(result.match.leagueName, lang)} ·{" "}
                         {result.match.sources.map((source) => SOURCE_NAMES[source] ?? source).join(", ")}
                       </p>
                     </div>

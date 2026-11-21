@@ -1,3 +1,4 @@
+import { extractMatchFormat } from "./format";
 import { describeError, resolveSport, type NormalizedEvent, type SourceAdapter, type SourceTask } from "./model";
 
 /**
@@ -91,6 +92,13 @@ async function fetchEvents(): Promise<NormalizedEvent[]> {
       away: { en: event.team2, ru: ruEvent?.team2 || event.team2 },
       startsAt,
       sourceHost: en.host,
+      matchFormat: extractMatchFormat({
+        sportKey: sport.key,
+        leagueEn: tournamentEn,
+        leagueRu: tournamentRu,
+        homeEn: event.team1,
+        awayEn: event.team2,
+      }),
     });
   }
 

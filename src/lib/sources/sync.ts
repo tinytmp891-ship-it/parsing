@@ -11,13 +11,23 @@ import {
 import { syncRuns, upcomingEvents } from "@/db/schema";
 import { getFeedHealth } from "@/lib/onexbet/feed";
 import { and, desc, eq, gt, lt, ne, sql } from "drizzle-orm";
+import { serializeMatchFormat } from "./format";
+import { serializeMatchVenueInfo, serializeTournamentStage } from "./match-details";
+import { bcgameAdapter } from "./bcgame";
 import { bet365Adapter } from "./bet365";
+import { betcityAdapter } from "./betcity";
 import { bwinAdapter } from "./bwin";
 import { pinnacleAdapter } from "./pinnacle";
 import { stakeAdapter } from "./stake";
 import { fonbetAdapter } from "./fonbet";
 import { marathonAdapter } from "./marathon";
+import { netbetAdapter } from "./netbet";
+import { oddspediaAdapter } from "./oddspedia";
+import { oddsportalAdapter } from "./oddsportal";
 import { onexbetAdapter } from "./onexbet";
+import { parimatchAdapter } from "./parimatch";
+import { totogamingAdapter } from "./totogaming";
+import { unibetAdapter } from "./unibet";
 import { vbetAdapter } from "./vbet";
 import {
   describeError,
@@ -42,10 +52,18 @@ const SOURCE_BUDGET_MS = 180_000;
 const ADAPTERS: SourceAdapter[] = [
   onexbetAdapter,
   fonbetAdapter,
-  vbetAdapter,
-  bet365Adapter,
+  betcityAdapter,
   marathonAdapter,
+  vbetAdapter,
+  unibetAdapter,
+  netbetAdapter,
+  bcgameAdapter,
+  parimatchAdapter,
+  oddsportalAdapter,
+  oddspediaAdapter,
+  bet365Adapter,
   bwinAdapter,
+  totogamingAdapter,
   stakeAdapter,
   pinnacleAdapter,
 ];
@@ -103,6 +121,9 @@ function toRow(event: NormalizedEvent, seenAt: Date): UpcomingRow {
     awayRu: event.away.ru || event.away.en,
     startsAt: event.startsAt,
     sourceHost: event.sourceHost,
+    matchFormat: serializeMatchFormat(event.matchFormat),
+    tournamentStage: serializeTournamentStage(event.tournamentStage),
+    matchInfo: serializeMatchVenueInfo(event.matchInfo),
     lastSeenAt: seenAt,
   };
 }
@@ -137,6 +158,9 @@ async function saveEvents(events: NormalizedEvent[], seenAt: Date): Promise<numb
           awayRu: sql`excluded.away_ru`,
           startsAt: sql`excluded.starts_at`,
           sourceHost: sql`excluded.source_host`,
+          matchFormat: sql`excluded.match_format`,
+          tournamentStage: sql`excluded.tournament_stage`,
+          matchInfo: sql`excluded.match_info`,
           lastSeenAt: sql`excluded.last_seen_at`,
         },
       });

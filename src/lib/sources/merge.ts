@@ -1,4 +1,20 @@
-import { eventAgeGroup, normalizeName, teamSimilarity, type LocalizedText, type NormalizedEvent, type SourceId } from "./model";
+import { extractMatchFormat, pickBestMatchFormat, type MatchFormat } from "./format";
+import {
+  extractTournamentStage,
+  mergeMatchVenueInfo,
+  pickBestTournamentStage,
+  type MatchVenueInfo,
+  type TournamentStage,
+} from "./match-details";
+import {
+  eventAgeGroup,
+  INDIVIDUAL_SPORTS,
+  normalizeName,
+  teamSimilarity,
+  type LocalizedText,
+  type NormalizedEvent,
+  type SourceId,
+} from "./model";
 
 /**
  * Merges the same match listed by several bookmakers into one entry.
@@ -10,8 +26,25 @@ import { eventAgeGroup, normalizeName, teamSimilarity, type LocalizedText, type 
 
 const TIME_TOLERANCE_MS = 10 * 60_000;
 const SIDE_THRESHOLD = 0.8;
-/** Prefer the earliest primary feed for display: 1xBet first, then Fonbet, then bet365. */
-const SOURCE_PRIORITY: Record<SourceId, number> = { "1xbet": 0, fonbet: 1, bet365: 2, marathon: 3, vbet: 4, bwin: 5, stake: 6, pinnacle: 7 };
+/** Prefer the earliest primary feed for display: 1xBet first, then Fonbet, Betcity, Marathonbet. */
+const SOURCE_PRIORITY: Record<SourceId, number> = {
+  "1xbet": 0,
+  fonbet: 1,
+  betcity: 2,
+  marathon: 3,
+  vbet: 4,
+  unibet: 5,
+  netbet: 6,
+  bcgame: 7,
+  parimatch: 8,
+  oddsportal: 9,
+  oddspedia: 10,
+  bet365: 11,
+  bwin: 12,
+  totogaming: 13,
+  stake: 14,
+  pinnacle: 15,
+};
 
 export type MatchRelation = "primary" | "full" | "partial";
 
@@ -33,6 +66,9 @@ export type MergedEntry = {
   leagueName: LocalizedText;
   home: LocalizedText;
   away: LocalizedText;
+  matchFormat: MatchFormat | null;
+  tournamentStage: TournamentStage | null;
+  matchInfo: MatchVenueInfo | null;
   matchType: "single" | "full" | "partial";
   sources: MergedSource[];
 };
@@ -62,21 +98,25 @@ function prepare(event: NormalizedEvent): Prepared {
   };
 }
 
-function sideScore(a: Names, b: Names): number {
-  return Math.max(teamSimilarity(a.en, b.en), teamSimilarity(a.ru, b.ru));
+function sideScore(a: Names, b: Names, individual: boolean): number {
+  return Math.max(
+    teamSimilarity(a.en, b.en, { individual }),
+    teamSimilarity(a.ru, b.ru, { individual }),
+  );
 }
 
 function relate(primary: Prepared, candidate: Prepared): { relation: "full" | "partial"; swapped: boolean } | null {
   // Different age groups (U18 vs U20) are different competitions, even when the team names match.
   if (primary.ageGroup && candidate.ageGroup && primary.ageGroup !== candidate.ageGroup) return null;
+  const individual = INDIVIDUAL_SPORTS.has(primary.event.sportKey);
   const straight = [
-    sideScore(primary.homeNorm, candidate.homeNorm),
-    sideScore(primary.awayNorm, candidate.awayNorm),
+    sideScore(primary.homeNorm, candidate.homeNorm, individual),
+    sideScore(primary.awayNorm, candidate.awayNorm, individual),
   ];
   // Some feeds list home and away the other way round.
   const crossed = [
-    sideScore(primary.homeNorm, candidate.awayNorm),
-    sideScore(primary.awayNorm, candidate.homeNorm),
+    sideScore(primary.homeNorm, candidate.awayNorm, individual),
+    sideScore(primary.awayNorm, candidate.homeNorm, individual),
   ];
   const swapped = crossed[0] + crossed[1] > straight[0] + straight[1];
   const [home, away] = swapped ? crossed : straight;
@@ -105,6 +145,33 @@ function toEntry(group: Group): MergedEntry {
 
   const matchType = sources.length === 1 ? "single" : group.partial ? "partial" : "full";
 
+  let matchFormat: MatchFormat | null = null;
+  let tournamentStage: TournamentStage | null = null;
+  let matchInfo: MatchVenueInfo | null = null;
+  for (const member of group.members) {
+    const ev = member.prepared.event;
+    const candidate =
+      ev.matchFormat ??
+      extractMatchFormat({
+        sportKey: ev.sportKey,
+        leagueEn: ev.leagueName.en,
+        leagueRu: ev.leagueName.ru,
+        homeEn: ev.home.en,
+        awayEn: ev.away.en,
+      });
+    matchFormat = pickBestMatchFormat(matchFormat, candidate);
+
+    const stageCandidate =
+      ev.tournamentStage ??
+      extractTournamentStage({
+        leagueEn: ev.leagueName.en,
+        leagueRu: ev.leagueName.ru,
+      });
+    tournamentStage = pickBestTournamentStage(tournamentStage, stageCandidate);
+
+    matchInfo = mergeMatchVenueInfo(matchInfo, ev.matchInfo);
+  }
+
   return {
     id: `${primary.source}-${primary.externalId}`,
     startsAt: primary.startsAt,
@@ -113,6 +180,9 @@ function toEntry(group: Group): MergedEntry {
     leagueName: primary.leagueName,
     home: primary.home,
     away: primary.away,
+    matchFormat,
+    tournamentStage,
+    matchInfo,
     matchType,
     sources,
   };

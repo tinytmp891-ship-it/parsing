@@ -1,36 +1,41 @@
+import { resilientFetch } from "@/lib/net/resilient-fetch";
+import { hasActiveProxyFor } from "@/lib/proxy/manager";
 import { describeError, SourceUnavailableError, type SourceAdapter, type SourceTask } from "./model";
 
 /**
  * bet365 (www.bet365.com).
  *
- * Status: bet365 blocks this server. Plain HTTP gets a Cloudflare "Attention Required" page (HTTP 403),
- * and a real headless browser gets "Sorry, you have been blocked", so no pre-match data can be read from
- * here. This adapter probes the site and reports the exact reason. The block is not worked around.
+ * Uses `resilientFetch` (Proxy Manager residential/mobile pool -> HTTP/2 curl -> Chromium CDP).
+ * Direct datacenter IPs are blocked by Cloudflare (HTTP 403); assign a clean GB/EU residential
+ * proxy in Proxy Manager for `bet365` to test/route traffic through a residential exit node.
  */
 
 const BET365_URL = "https://www.bet365.com/";
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 async function probe(): Promise<never> {
-  let response: Response;
+  let res: Awaited<ReturnType<typeof resilientFetch>>;
   try {
-    response = await fetch(BET365_URL, {
-      cache: "no-store",
-      headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
-      signal: AbortSignal.timeout(20_000),
+    res = await resilientFetch({
+      url: BET365_URL,
+      sourceId: "bet365",
+      headers: { Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+      allowChromiumFallback: true,
+      preferHttp2: true,
+      timeoutMs: 20_000,
     });
   } catch (error) {
-    // Network errors are retried on the next sync; only real blocks are cached as unavailable.
     throw new Error(`bet365.com is unreachable: ${describeError(error)}`);
   }
 
-  const body = await response.text().catch(() => "");
-  if (response.status === 403 || /attention required|you have been blocked|cloudflare/i.test(body)) {
-    throw new SourceUnavailableError(`bet365.com blocks this server (HTTP ${response.status}, Cloudflare)`);
+  const hint = hasActiveProxyFor("bet365")
+    ? "assigned proxy was also blocked"
+    : "add a GB/EU residential proxy in Proxy Manager";
+
+  if (res.status === 403 || /attention required|you have been blocked|cloudflare/i.test(res.text)) {
+    throw new SourceUnavailableError(`bet365.com blocks this IP (HTTP ${res.status}, Cloudflare; ${hint})`);
   }
   throw new SourceUnavailableError(
-    "bet365.com is reachable, but the bet365 pre-match feed parser is not implemented yet",
+    `bet365.com responded HTTP ${res.status} (${res.via}); proprietary binary/WebSocket feed parser requires live session tokens`,
   );
 }
 

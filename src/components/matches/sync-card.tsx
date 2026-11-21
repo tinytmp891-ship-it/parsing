@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp, RefreshCw, Shield } from "lucide-react";
 import type { Dict } from "@/lib/i18n";
 import { formatElapsed, statusOf, type SyncSource, type SyncStatus } from "@/lib/matches-types";
 
@@ -100,25 +101,32 @@ export function SyncCard({
   t,
   refreshing,
   onRefresh,
+  onOpenProxyManager,
 }: {
   sync: SyncStatus;
   t: Dict;
   refreshing: boolean;
   onRefresh: () => void;
+  onOpenProxyManager?: () => void;
 }) {
-  // Ticks while a sync runs, so the elapsed time and per-bookmaker states stay live.
   const [now, setNow] = useState(0);
   const [open, setOpen] = useState(true);
 
   useEffect(() => {
-    if (window.localStorage.getItem(FEEDS_OPEN_KEY) === "0") setOpen(false);
+    const timer = window.setTimeout(() => {
+      if (window.localStorage.getItem(FEEDS_OPEN_KEY) === "0") setOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    setNow(Date.now());
-    if (!sync.running) return;
+    const tick = window.setTimeout(() => setNow(Date.now()), 0);
+    if (!sync.running) return () => window.clearTimeout(tick);
     const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearTimeout(tick);
+      window.clearInterval(id);
+    };
   }, [sync.running]);
 
   const toggleOpen = () => {
@@ -133,36 +141,46 @@ export function SyncCard({
   const unavailable = views.filter(({ view }) => view.tone === "bad").length;
 
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="ui-card ui-card-pad bg-white shadow-sm ring-1 ring-slate-200/90">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.sourcesTitle}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{t.sourcesTitle}</p>
+          <span className="text-xs font-medium text-slate-600">{t.feedsSummary(online, unavailable)}</span>
           {sync.running ? (
-            <span className="inline-flex items-center gap-2 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-sky-900">
+            <span className="ui-control inline-flex items-center gap-2 bg-sky-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-sky-900">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-600" />
               {t.syncElapsed(formatElapsed(elapsed))}
             </span>
           ) : null}
-          {!open ? (
-            <span className="text-xs font-medium text-slate-600">{t.feedsSummary(online, unavailable)}</span>
-          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {unavailable > 0 && onOpenProxyManager ? (
+            <button
+              type="button"
+              onClick={onOpenProxyManager}
+              className="ui-control inline-flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100"
+            >
+              <Shield className="h-3.5 w-3.5" aria-hidden />
+              {t.proxyOpenManager}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={toggleOpen}
             aria-expanded={open}
-            className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+            className="ui-control inline-flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
           >
-            {open ? `▾ ${t.feedsCollapse}` : `▸ ${t.feedsExpand}`}
+            {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+            {open ? t.feedsCollapse : t.feedsExpand}
           </button>
           <button
             type="button"
             onClick={onRefresh}
             disabled={refreshing || sync.running}
-            className="rounded-full bg-slate-900 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="ui-control ui-accent-bg inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50"
           >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing || sync.running ? "animate-spin" : ""}`} aria-hidden />
             {refreshing || sync.running ? t.syncing : t.refresh}
           </button>
         </div>
@@ -170,9 +188,12 @@ export function SyncCard({
 
       {open ? (
         <div className="mt-4 space-y-3">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {views.map(({ source, view }) => (
-              <div key={source.id} className="rounded-xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200">
+              <div
+                key={source.id}
+                className="rounded-xl bg-slate-50/90 p-3 ring-1 ring-inset ring-slate-200/80 transition hover:ring-slate-300"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-slate-900">{source.label}</span>
                   <span className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold ${TONE_TEXT[view.tone]}`}>
@@ -219,7 +240,7 @@ export function SyncCard({
                 <span
                   key={domain.domain}
                   title={domain.error ?? undefined}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${tone}`}
+                  className={`ui-control inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium ring-1 ring-inset ${tone}`}
                 >
                   1xBet · {domain.domain} · {domain.ok === false ? t.domainOffline : domain.ok ? t.domainOnline : "—"}
                   {sync.feedHealth.lastGoodDomain === domain.domain ? ` · ${t.inUse}` : ""}
@@ -229,12 +250,12 @@ export function SyncCard({
           </div>
         </div>
       ) : (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {views.map(({ source, view }) => (
             <span
               key={source.id}
               title={view.detail || view.label}
-              className={`inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium ring-1 ring-inset ring-slate-200 ${TONE_TEXT[view.tone]}`}
+              className={`ui-control inline-flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 text-xs font-medium ring-1 ring-inset ring-slate-200 ${TONE_TEXT[view.tone]}`}
             >
               <span className={`h-2 w-2 rounded-full ${TONE_DOT[view.tone]}`} />
               {source.label}

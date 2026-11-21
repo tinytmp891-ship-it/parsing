@@ -79,6 +79,9 @@ export function memUpsertEvents(rows: UpcomingInsert[]): void {
       awayRu: row.awayRu,
       startsAt: row.startsAt,
       sourceHost: row.sourceHost ?? null,
+      matchFormat: row.matchFormat ?? null,
+      tournamentStage: row.tournamentStage ?? null,
+      matchInfo: row.matchInfo ?? null,
       lastSeenAt: row.lastSeenAt ?? new Date(),
     });
   }

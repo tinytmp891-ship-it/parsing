@@ -1,11 +1,14 @@
 import {
   ageGroupOf,
   eventAgeGroup,
+  INDIVIDUAL_SPORTS,
   normalizeName,
+  SOURCE_IDS,
   sportKeyFromText,
   teamSimilarity,
   type LocalizedText,
   type NormalizedEvent,
+  type SourceId,
 } from "./model";
 
 /**
@@ -16,6 +19,7 @@ import {
  * - both team names are compared with every event that starts within the next 24 hours
  *   (English and Russian names, either order)
  * - the stated sport is searched first; if nothing matches there, all sports are searched
+ * - individual sports also match participant names written with initials (e.g. "J. Sinner" vs "Jannik Sinner")
  *
  * green  = both teams match a scheduled match
  * yellow = exactly one team matches
@@ -27,6 +31,7 @@ export const MAX_CHECK_LINES = 100;
 export const CHECK_WINDOW_MS = 24 * 3600_000;
 
 const SIDE_THRESHOLD = 0.8;
+const SIBLING_TIME_MS = 10 * 60_000;
 const ID_BONUS = 0.1;
 const PREFIX_LENGTH = 3;
 const RANK = { green: 3, yellow: 2, red: 1, invalid: 0 } as const;
@@ -101,6 +106,7 @@ type Indexed = {
   awayNames: string[];
   prefixes: Set<string>;
   ageGroup: string | null;
+  individual: boolean;
 };
 
 type Best = {
@@ -120,7 +126,7 @@ function prefixesOf(names: string[]): Set<string> {
   const prefixes = new Set<string>();
   for (const name of names) {
     for (const token of name.split(" ")) {
-      if (token.length >= PREFIX_LENGTH) prefixes.add(token.slice(0, PREFIX_LENGTH));
+      if (token.length >= 2) prefixes.add(token.slice(0, Math.min(PREFIX_LENGTH, token.length)));
     }
   }
   return prefixes;
@@ -136,14 +142,15 @@ function buildIndex(events: NormalizedEvent[]): Indexed[] {
       awayNames,
       prefixes: prefixesOf([...homeNames, ...awayNames]),
       ageGroup: eventAgeGroup(event),
+      individual: INDIVIDUAL_SPORTS.has(event.sportKey),
     };
   });
 }
 
-function bestSide(name: string, candidates: string[]): number {
+function bestSide(name: string, candidates: string[], individual: boolean): number {
   let best = 0;
   for (const candidate of candidates) {
-    const score = teamSimilarity(name, candidate);
+    const score = teamSimilarity(name, candidate, { individual });
     if (score > best) best = score;
   }
   return best;
@@ -151,12 +158,53 @@ function bestSide(name: string, candidates: string[]): number {
 
 /** Scores the pasted home/away names against an event, trying both home/away orders. */
 function evaluate(homeName: string, awayName: string, item: Indexed) {
-  const straight = bestSide(homeName, item.homeNames) + bestSide(awayName, item.awayNames);
-  const crossed = bestSide(homeName, item.awayNames) + bestSide(awayName, item.homeNames);
-  if (crossed > straight) {
-    return { home: bestSide(homeName, item.awayNames), away: bestSide(awayName, item.homeNames) };
+  const individual = item.individual;
+  const straightHome = bestSide(homeName, item.homeNames, individual);
+  const straightAway = bestSide(awayName, item.awayNames, individual);
+  const crossedHome = bestSide(homeName, item.awayNames, individual);
+  const crossedAway = bestSide(awayName, item.homeNames, individual);
+  if (crossedHome + crossedAway > straightHome + straightAway) {
+    return { home: crossedHome, away: crossedAway };
   }
-  return { home: bestSide(homeName, item.homeNames), away: bestSide(awayName, item.awayNames) };
+  return { home: straightHome, away: straightAway };
+}
+
+function bestPairScore(aList: string[], bList: string[], individual: boolean): number {
+  let best = 0;
+  for (const a of aList) {
+    for (const b of bList) {
+      const score = teamSimilarity(a, b, { individual });
+      if (score > best) best = score;
+    }
+  }
+  return best;
+}
+
+/** Finds every bookmaker in `index` that lists the same scheduled match as `target`. */
+function collectSourcesForMatch(target: Indexed, index: Indexed[]): SourceId[] {
+  const sources = new Set<SourceId>([target.event.source]);
+  const targetMs = target.event.startsAt.getTime();
+  const individual = target.individual;
+
+  for (const candidate of index) {
+    if (candidate.event.source === target.event.source) continue;
+    if (candidate.event.sportKey !== target.event.sportKey) continue;
+    if (Math.abs(candidate.event.startsAt.getTime() - targetMs) > SIBLING_TIME_MS) continue;
+    if (target.ageGroup && candidate.ageGroup && target.ageGroup !== candidate.ageGroup) continue;
+
+    const straightOk =
+      bestPairScore(target.homeNames, candidate.homeNames, individual) >= SIDE_THRESHOLD &&
+      bestPairScore(target.awayNames, candidate.awayNames, individual) >= SIDE_THRESHOLD;
+    const crossedOk =
+      bestPairScore(target.homeNames, candidate.awayNames, individual) >= SIDE_THRESHOLD &&
+      bestPairScore(target.awayNames, candidate.homeNames, individual) >= SIDE_THRESHOLD;
+
+    if (straightOk || crossedOk) {
+      sources.add(candidate.event.source);
+    }
+  }
+
+  return SOURCE_IDS.filter((id) => sources.has(id));
 }
 
 /** Best green/yellow candidate among events in the window (optionally limited to one sport). */
@@ -211,9 +259,8 @@ function findBest(
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
-export function checkLines(rawLines: string[], events: NormalizedEvent[]): CheckResult[] {
+export function checkLines(rawLines: string[], events: NormalizedEvent[], nowMs = Date.now()): CheckResult[] {
   const index = buildIndex(events);
-  const nowMs = Date.now();
 
   return rawLines.map((raw, position) => {
     const parsed = parseMatchLine(raw);
@@ -241,6 +288,7 @@ export function checkLines(rawLines: string[], events: NormalizedEvent[]): Check
     }
 
     const event = best.item.event;
+    const sources = collectSourcesForMatch(best.item, index);
     return {
       ...base,
       status: best.status,
@@ -256,7 +304,7 @@ export function checkLines(rawLines: string[], events: NormalizedEvent[]): Check
         leagueName: event.leagueName,
         home: event.home,
         away: event.away,
-        sources: [event.source],
+        sources,
         idMatched: best.idMatched,
       },
     };
